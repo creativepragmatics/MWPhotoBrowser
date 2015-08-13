@@ -1103,7 +1103,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     
     // Disable action button if there is no image or it's a video
     MWPhoto *photo = [self photoAtIndex:_currentPageIndex];
-    if ([photo underlyingImage] == nil || ([photo respondsToSelector:@selector(isVideo)] && photo.isVideo)) {
+    if ([photo underlyingImage] == nil && !([photo respondsToSelector:@selector(isVideo)] && photo.isVideo)) {
         _actionButton.enabled = NO;
         _actionButton.tintColor = [UIColor clearColor]; // Tint to hide button
     } else {
@@ -1555,7 +1555,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 
     // Only react when image has loaded
     id <MWPhoto> photo = [self photoAtIndex:_currentPageIndex];
-    if ([self numberOfPhotos] > 0 && [photo underlyingImage]) {
+    if ([self numberOfPhotos] > 0 && ([photo underlyingImage] || ([photo respondsToSelector:@selector(isVideo)] && photo.isVideo))) {
         
         // If they have defined a delegate method then just message them
         if ([self.delegate respondsToSelector:@selector(photoBrowser:actionButtonPressedForPhotoAtIndex:)]) {
@@ -1564,14 +1564,20 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
             [self.delegate photoBrowser:self actionButtonPressedForPhotoAtIndex:_currentPageIndex];
             
         } else {
+            NSMutableArray *items = NSMutableArray.new;
+            
+            if ([photo underlyingImage]) {
+                [items addObject:[photo underlyingImage]];
+                if (photo.caption) {
+                    [items addObject:photo.caption];
+                }
+            } else if ([photo isKindOfClass:MWPhoto.class] && photo.isVideo && [((MWPhoto *)photo).videoURL isFileReferenceURL]) {
+                [items addObject:[(MWPhoto *)photo videoURL]];
+            }
             
             // Show activity view controller
-            NSMutableArray *items = [NSMutableArray arrayWithObject:[photo underlyingImage]];
-            if (photo.caption) {
-                [items addObject:photo.caption];
-            }
             self.activityViewController = [[UIActivityViewController alloc] initWithActivityItems:items applicationActivities:nil];
-            
+
             // Show loading spinner after a couple of seconds
             double delayInSeconds = 2.0;
             dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
